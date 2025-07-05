@@ -5,25 +5,32 @@ using Microsoft.AspNetCore.Mvc;
 namespace Fynex.Service.WhatsApp.Api.Controllers
 {
     [ApiController]
-    [Route("api/webhook")]
-    public class WebhookController : ControllerBase
+    [Route("api/[controller]")]
+    public class WhatsAppController : ControllerBase
     {
-        private readonly OpenAiService _ai;
-        private readonly TwilioService _twilio;
+        private readonly TwilioService _twilioService;
+        private readonly OpenAiService _openAiService;
 
-        public WebhookController(OpenAiService ai, TwilioService twilio)
+        public WhatsAppController(TwilioService twilioService, OpenAiService openAiService)
         {
-            _ai = ai;
-            _twilio = twilio;
+            _twilioService = twilioService;
+            _openAiService = openAiService;
         }
 
         [HttpPost]
-        public async Task<IActionResult> Post([FromBody] WhatsAppMessage msg)
+        public async Task<IActionResult> ReceiveMessage([FromForm] string Body, [FromForm] string From)
         {
-            var reply = await _ai.GetReplyAsync(msg.Body);
-            await _twilio.SendMessageAsync(msg.From, reply);
+            if (string.IsNullOrEmpty(Body) || string.IsNullOrEmpty(From))
+                return BadRequest("Missing message or sender");
+
+            // Llama a OpenAI
+            var response = await _openAiService.SendMessageAsync(Body);
+
+            // Responde por WhatsApp
+            await _twilioService.SendMessageAsync(From, response);
+
             return Ok();
         }
     }
-
 }
+
